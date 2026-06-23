@@ -175,6 +175,31 @@ def test_table_sort_keeps_source_mapping(app):
     assert src_row == 1                # source row (insertion position) — differs, proving mapping
 
 
+def test_field_names_include_nested_paths(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([
+        {"name": "A", "address": {"city": "Paris", "geo": {"lat": 1}}},
+    ]))
+    win.sync_from_editor()
+    names = win._field_names()
+    assert "name" in names
+    assert "address" in names
+    assert "address__city" in names
+    assert "address__geo__lat" in names
+
+
+def test_field_values_resolves_nested_path(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([
+        {"address": {"city": "Paris"}},
+        {"address": {"city": "Rome"}},
+        {"address": {"city": "Paris"}},
+    ]))
+    win.sync_from_editor()
+    assert win._field_values("address__city") == ["Paris", "Rome"]
+    assert win._field_values("address__missing") == []
+
+
 def test_field_values_distinct_and_stringified(app):
     win = MainWindow()
     win.editor.set_text(json.dumps([

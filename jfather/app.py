@@ -33,6 +33,9 @@ from .table_model import JsonTableModel, is_tabular
 from .tree_model import JsonTreeModel, index_for_path, path_for_index
 
 
+_MISSING = object()
+
+
 def _scalar_text(value):
     """Render a scalar as the token text the query parser coerces back."""
     if value is None:
@@ -40,6 +43,34 @@ def _scalar_text(value):
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _flatten_keys(obj, prefix="", depth=0, max_depth=5):
+    """Yield `field` and nested `parent__child` paths for a dict's keys.
+
+    Mirrors collection-query's `__` traversal: only descends into nested dicts
+    (not lists), so suggested paths are queryable.
+    """
+    paths = []
+    if not isinstance(obj, dict):
+        return paths
+    for key, value in obj.items():
+        path = f"{prefix}__{key}" if prefix else str(key)
+        paths.append(path)
+        if isinstance(value, dict) and depth < max_depth:
+            paths.extend(_flatten_keys(value, path, depth + 1, max_depth))
+    return paths
+
+
+def _resolve_path(item, path):
+    """Walk a `__`-split field path through nested dicts; `_MISSING` if absent."""
+    current = item
+    for key in path:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return _MISSING
+    return current
 
 
 class MainWindow(QMainWindow):
@@ -302,32 +333,34 @@ class MainWindow(QMainWindow):
         self._refresh_view()
 
     def _field_names(self):
+        """Field names for the focused data, including nested `a__b` paths."""
         value = self.focused_value()
+        if isinstance(value, list):
+            items = [item for item in value if isinstance(item, dict)]
+        elif isinstance(value, dict):
+            items = [value]
+        else:
+            items = []
         names = []
         seen = set()
-        if isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict):
-                    for key in item.keys():
-                        if key not in seen:
-                            seen.add(key)
-                            names.append(key)
-        elif isinstance(value, dict):
-            names = list(value.keys())
+        for item in items:
+            for path in _flatten_keys(item):
+                if path not in seen:
+                    seen.add(path)
+                    names.append(path)
         return names
 
     def _field_values(self, field, limit=200):
-        """Distinct scalar values for `field` across the focused array."""
+        """Distinct scalar values for `field` (incl. nested paths) in the array."""
         value = self.focused_value()
         if not field or not isinstance(value, list):
             return []
+        path = field.split("__")
         out = []
         seen = set()
         for item in value:
-            if not isinstance(item, dict) or field not in item:
-                continue
-            cell = item[field]
-            if isinstance(cell, (dict, list)):
+            cell = _resolve_path(item, path)
+            if cell is _MISSING or isinstance(cell, (dict, list)):
                 continue
             text = _scalar_text(cell)
             if text not in seen:
