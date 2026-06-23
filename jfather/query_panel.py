@@ -1,10 +1,12 @@
 """Collection-query builder panel with structured and text modes."""
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
@@ -13,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import query
+from . import query, theme
 
 
 class _TextRow(QWidget):
@@ -30,8 +32,15 @@ class _TextRow(QWidget):
             completer = QCompleter(list(field_names))
             completer.setCaseSensitivity(Qt.CaseInsensitive)
             self.tokens.setCompleter(completer)
+        mono = QFont()
+        mono.setFamily(theme.MONO_FONT_FAMILY.split(",")[0].strip())
+        mono.setStyleHint(QFont.Monospace)
+        self.tokens.setFont(mono)
+        self.remove = QPushButton("\u2212")
+        self.remove.setFixedWidth(32)
         layout.addWidget(self.op)
         layout.addWidget(self.tokens)
+        layout.addWidget(self.remove)
 
     def as_text(self):
         return (self.op.currentText(), self.tokens.text())
@@ -56,10 +65,13 @@ class _StructuredRow(QWidget):
         self.lookup.setCurrentText(lookup)
         self.value = QLineEdit(value)
         self.value.setPlaceholderText("value")
+        self.remove = QPushButton("\u2212")
+        self.remove.setFixedWidth(32)
         layout.addWidget(self.op)
         layout.addWidget(self.field)
         layout.addWidget(self.lookup)
         layout.addWidget(self.value)
+        layout.addWidget(self.remove)
 
     def _key(self):
         field = self.field.currentText().strip()
@@ -114,16 +126,31 @@ class QueryPanel(QWidget):
         layout.addWidget(self.stack)
 
         buttons = QHBoxLayout()
-        self.add_button = QPushButton("+ Condition")
+        self.add_button = QPushButton("\uff0b")
+        self.add_button.setFixedWidth(36)
         self.add_button.clicked.connect(self._on_add)
-        self.run_button = QPushButton("Run")
+        self.run_button = QPushButton("\u25b6 Run")
         self.run_button.clicked.connect(self.runRequested.emit)
         buttons.addWidget(self.add_button)
+        buttons.addStretch()
         buttons.addWidget(self.run_button)
         layout.addLayout(buttons)
 
+        results_header = QHBoxLayout()
+        self.count_label = QLabel("0 results")
+        self.copy_button = QPushButton("\u29c9 Copy")
+        self.copy_button.clicked.connect(self._copy_results)
+        results_header.addWidget(self.count_label)
+        results_header.addStretch()
+        results_header.addWidget(self.copy_button)
+        layout.addLayout(results_header)
+
         self.results = QPlainTextEdit()
         self.results.setReadOnly(True)
+        mono = QFont()
+        mono.setFamily(theme.MONO_FONT_FAMILY.split(",")[0].strip())
+        mono.setStyleHint(QFont.Monospace)
+        self.results.setFont(mono)
         layout.addWidget(self.results)
 
         self.set_rows([("filter", "")])
@@ -161,6 +188,7 @@ class QueryPanel(QWidget):
                     row = _StructuredRow(op, field, lookup, value,
                                          field_names, self.lookups)
                     self._structured_rows.append(row)
+                    self._register_row(row)
                     self._structured_layout.addWidget(row)
             if not self._structured_rows:
                 self._add_structured_row(field_names)
@@ -169,6 +197,7 @@ class QueryPanel(QWidget):
             for op, text in rows:
                 row = _TextRow(op, text, field_names)
                 self._text_rows.append(row)
+                self._register_row(row)
                 self._text_layout.addWidget(row)
             if not self._text_rows:
                 self._add_text_row(field_names)
@@ -180,14 +209,34 @@ class QueryPanel(QWidget):
         field, lookup = query.split_key(key.strip(), self.lookups)
         return (field, lookup, value.strip())
 
+    def _register_row(self, row):
+        row.remove.clicked.connect(lambda _=False, r=row: self._remove_row(r))
+
+    def _remove_row(self, row):
+        for holder, layout in (
+            (self._structured_rows, self._structured_layout),
+            (self._text_rows, self._text_layout),
+        ):
+            if row in holder:
+                holder.remove(row)
+                layout.removeWidget(row)
+                row.deleteLater()
+                return
+
+    def _copy_results(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.results.toPlainText())
+
     def _add_text_row(self, field_names):
         row = _TextRow("filter", "", field_names)
         self._text_rows.append(row)
+        self._register_row(row)
         self._text_layout.addWidget(row)
 
     def _add_structured_row(self, field_names):
         row = _StructuredRow("filter", "", "exact", "", field_names, self.lookups)
         self._structured_rows.append(row)
+        self._register_row(row)
         self._structured_layout.addWidget(row)
 
     def _on_add(self):
@@ -219,8 +268,10 @@ class QueryPanel(QWidget):
                 result.append((op, query.parse_tokens(text)))
         return result
 
-    def set_results_text(self, text):
+    def set_results_text(self, text, count=None):
         self.results.setPlainText(text)
+        if count is not None:
+            self.count_label.setText(f"{count} result" + ("" if count == 1 else "s"))
 
     def set_run_enabled(self, enabled):
         self.run_button.setEnabled(enabled)
