@@ -12,11 +12,19 @@ uv run python main.py
 
 ## Features
 
-- Multiple documents via the left sidebar (New / Open / Close, dirty markers).
-- Dual-pane: syntax-highlighted text editor + data viewer.
-- Viewer shows a **table** for arrays of objects and a **tree** otherwise.
+- Single warm **dark theme** with native scrollbars (no light/theme toggle).
+- Grouped glyph **toolbar** (FILE / TRANSFORM / SETTINGS, with Close at the far
+  right).
+- Multiple documents via the left sidebar (with a distinct background and a
+  bottom **+ New** button; New / Open / Close, dirty markers).
+- Dual-pane: syntax-highlighted text editor with a **line-number gutter** +
+  data viewer.
+- Viewer shows a **table** for arrays of objects and a **tree** otherwise. The
+  table is **sortable** and **resizable**, with monospace cells and JSON
+  tooltips on nested cells.
 - **Focus / drill-in**: double-click a node or table row to re-root the viewer
-  and query scope; a breadcrumb navigates back.
+  and query scope; **breadcrumb pills** navigate back, with a drill-in hint at
+  the root.
 - Format, Minify, Escape, Unescape (selection-aware).
 - **Query builder** with Structured (field / lookup / value dropdowns) and Text
   (tokens with autocomplete) modes; runs against the focused array (Run is
@@ -28,7 +36,11 @@ uv run python main.py
     `istartswith`, `iendswith`, `iexact`, `iregex`).
   - Unknown lookups report a clear error in the results pane instead of
     silently returning nothing.
-- In-editor **Find** bar; data **search** across the active tree or table.
+  - Per-row remove (**−**) / add (**＋**) controls, a **Copy** button for the
+    results, and a result **count**; the status bar shows the match count after
+    a query runs.
+- In-editor **"Find in file…"** bar; data **search** across the active tree or
+  table.
 - Cross-platform shortcuts: Close (Ctrl/Cmd+W), Save (Ctrl/Cmd+S),
   Format (Ctrl/Cmd+Shift+F), Run query (Ctrl/Cmd+Return), Find (Ctrl/Cmd+F).
 
