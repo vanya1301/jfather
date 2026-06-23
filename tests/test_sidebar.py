@@ -46,5 +46,6 @@ def test_selection_emits_signal(app):
     bar.refresh(mgr)
     seen = []
     bar.documentSelected.connect(seen.append)
-    bar.list.setCurrentRow(1)
-    assert seen[-1] == 1
+    # Active row is 1 after refresh; selecting a different row emits the signal.
+    bar.list.setCurrentRow(0)
+    assert seen[-1] == 0
