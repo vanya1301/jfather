@@ -49,3 +49,15 @@ def test_selection_emits_signal(app):
     # Active row is 1 after refresh; selecting a different row emits the signal.
     bar.list.setCurrentRow(0)
     assert seen[-1] == 0
+
+
+def test_has_object_name(app):
+    bar = DocumentSidebar()
+    assert bar.objectName() == "documentSidebar"
+
+
+def test_new_button_below_list(app):
+    bar = DocumentSidebar()
+    layout = bar.layout()
+    widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+    assert widgets.index(bar.list) < widgets.index(bar.new_button)

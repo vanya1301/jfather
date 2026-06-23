@@ -18,22 +18,24 @@ class DocumentSidebar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._suppress = False
+        self.setObjectName("documentSidebar")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-
-        self.new_button = QPushButton("+ New")
-        self.new_button.clicked.connect(self.newRequested.emit)
-        layout.addWidget(self.new_button)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
 
         self.list = QListWidget()
         self.list.currentRowChanged.connect(self._on_row_changed)
         layout.addWidget(self.list)
 
+        self.new_button = QPushButton("\uff0b New")
+        self.new_button.clicked.connect(self.newRequested.emit)
+        layout.addWidget(self.new_button)
+
         self.close_button = QPushButton("Close")
         self.close_button.clicked.connect(self._on_close_clicked)
         layout.addWidget(self.close_button)
 
-        self.setMaximumWidth(220)
+        self.setMaximumWidth(240)
 
     def _on_row_changed(self, row):
         if not self._suppress and row >= 0:
