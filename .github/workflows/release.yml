@@ -91,8 +91,9 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         cd dist
-        # Upload the .app bundle for macOS
-        mv jfather.app ${{ matrix.artifact_name }}.app
+        # Create a zip of the .app bundle for macOS
+        mv jfather.app jfather-macos.app
+        zip -r jfather-macos.zip jfather-macos.app
     
     - name: Prepare Linux artifact
       if: matrix.os == 'ubuntu-latest'
@@ -106,7 +107,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.asset_name }}
-        path: dist/${{ matrix.artifact_name }}.app
+        path: dist/jfather-macos.zip
     
     - name: Upload Linux artifact
       if: matrix.os == 'ubuntu-latest'
@@ -142,7 +143,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/jfather-macos.app
+          dist/jfather-macos.zip
           dist/jfather-linux
         generate_release_notes: true
         draft: false
