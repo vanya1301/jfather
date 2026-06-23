@@ -142,7 +142,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/jfather-macos
+          dist/jfather-macos.app
           dist/jfather-linux
         generate_release_notes: true
         draft: false
