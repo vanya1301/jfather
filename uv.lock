@@ -4,11 +4,11 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "collection-query"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/42/01/c92af8d35533eba03a58fdbf61a44271e01ec18d5fcaa0006676ede90ab7/collection_query-0.1.0.tar.gz", hash = "sha256:2d8398f28aa06a48836a739f2ee1bf727de2bd82dc958ad813e9d7a9420d88f6", size = 4612, upload-time = "2026-06-23T05:52:35.641Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/74/e7e5bc8f29c9ee5bd4194a4ca78c3c36aad7773b2ead3a97543877c4a48b/collection_query-0.2.0.tar.gz", hash = "sha256:8e7d13bfff258ab6238ae0479c6421a077d83ae016a10a67c1a98d6a6511bc6e", size = 7937, upload-time = "2026-06-23T06:55:49.57Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/41/9b462a9d954ae47632146a9d4c0b07f3ac11454a2d743e051f1b94ad6f22/collection_query-0.1.0-py3-none-any.whl", hash = "sha256:ea74029af5e28ec81f7d92304a3d1782dde06aca1c6dde31b0bcb14005c6a33f", size = 6038, upload-time = "2026-06-23T05:52:34.43Z" },
+    { url = "https://files.pythonhosted.org/packages/52/31/241ac9744215c4d63b3ddff2f2f622d3de8190e0067fcfc081469b5159c4/collection_query-0.2.0-py3-none-any.whl", hash = "sha256:74a7ae7accc867dd5bf89e9f0c1ba83e64483cd146b9c557ef822c0803c99edd", size = 9759, upload-time = "2026-06-23T06:55:48.532Z" },
 ]
 
 [[package]]
@@ -45,7 +45,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "collection-query", specifier = ">=0.1.0" },
+    { name = "collection-query", specifier = ">=0.2.0" },
     { name = "pyside6", specifier = ">=6.6" },
 ]
 

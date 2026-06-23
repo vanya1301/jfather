@@ -5,7 +5,7 @@ description = "Desktop viewer/editor for large JSON with collection-query"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "collection-query>=0.1.0",
+    "collection-query>=0.2.0",
     "pyside6>=6.6",
 ]
 

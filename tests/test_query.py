@@ -67,3 +67,16 @@ def test_run_query_rejects_bad_op():
 def test_build_query_end_to_end():
     raw_rows = [("filter", "dept__name=Eng"), ("exclude", "name=Cy")]
     assert query.build_query(DATA, raw_rows) == [DATA[0]]
+
+
+def test_run_query_unknown_lookup_raises_value_error():
+    # collection-query >=0.2.0 raises FieldLookupError for unknown lookups;
+    # run_query normalizes it to ValueError so the GUI can display it.
+    with pytest.raises(ValueError):
+        query.run_query(DATA, [("filter", {"id__bogus": 1})])
+
+
+def test_available_lookups_exposed():
+    lookups = query.available_lookups()
+    assert "contains" in lookups
+    assert "gt" in lookups

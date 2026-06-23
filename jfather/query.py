@@ -1,8 +1,13 @@
 """Parse query-bar tokens and run collection-query against list data."""
 
-from collection_query import ListQuery
+from collection_query import FieldLookupError, ListQuery
 
 _VALID_OPS = ("filter", "exclude")
+
+
+def available_lookups():
+    """Return the lookup names supported by the installed collection-query."""
+    return ListQuery([]).available_lookups()
 
 
 def coerce_scalar(s):
@@ -62,7 +67,10 @@ def run_query(data, rows):
     for op, kwargs in rows:
         if op not in _VALID_OPS:
             raise ValueError(f"Unknown query op: {op!r}")
-        result = getattr(result, op)(**kwargs)
+        try:
+            result = getattr(result, op)(**kwargs)
+        except FieldLookupError as exc:
+            raise ValueError(str(exc)) from exc
     return list(result)
 
 
