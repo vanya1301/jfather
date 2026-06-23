@@ -24,11 +24,26 @@ def test_columns_are_union_in_first_seen_order():
 
 
 def test_cell_scalar_and_nested_rendering():
-    model = JsonTableModel([{"a": 1, "b": {"x": 2}}])
+    model = JsonTableModel([{"a": 1, "b": {"x": 2}, "c": [1, 2, 3]}])
     a = model.index(0, 0, QModelIndex())
     b = model.index(0, 1, QModelIndex())
+    c = model.index(0, 2, QModelIndex())
     assert model.data(a, Qt.DisplayRole) == "1"
-    assert model.data(b, Qt.DisplayRole) == '{"x": 2}'
+    assert model.data(b, Qt.DisplayRole) == "{\u2026} 1 key"
+    assert model.data(c, Qt.DisplayRole) == "[\u2026] 3 items"
+
+
+def test_nested_cell_tooltip_is_pretty_json():
+    model = JsonTableModel([{"b": {"x": 2}}])
+    b = model.index(0, 0, QModelIndex())
+    tip = model.data(b, Qt.ToolTipRole)
+    assert tip == '{\n  "x": 2\n}'
+
+
+def test_scalar_cell_has_no_tooltip():
+    model = JsonTableModel([{"a": 1}])
+    a = model.index(0, 0, QModelIndex())
+    assert model.data(a, Qt.ToolTipRole) is None
 
 
 def test_missing_key_is_empty():

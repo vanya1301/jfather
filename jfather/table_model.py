@@ -13,14 +13,24 @@ def is_tabular(data):
     return dict_count * 2 >= len(data)
 
 
-def _cell_text(value):
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, ensure_ascii=False)
+def _cell_display(value):
+    if isinstance(value, dict):
+        n = len(value)
+        return f"{{\u2026}} {n} key" + ("" if n == 1 else "s")
+    if isinstance(value, list):
+        n = len(value)
+        return f"[\u2026] {n} item" + ("" if n == 1 else "s")
     if value is None:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _cell_tooltip(value):
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    return None
 
 
 class JsonTableModel(QAbstractTableModel):
@@ -57,15 +67,25 @@ class JsonTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self._columns)
 
     def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid() or role != Qt.DisplayRole:
+        if not index.isValid():
             return None
         item = self._rows[index.row()]
         if isinstance(item, dict):
             key = self._columns[index.column()]
-            if key in item:
-                return _cell_text(item[key])
-            return ""
-        return _cell_text(item) if index.column() == 0 else ""
+            value = item[key] if key in item else None
+            present = key in item
+        else:
+            value = item if index.column() == 0 else None
+            present = index.column() == 0
+        if role == Qt.DisplayRole:
+            if not present:
+                return ""
+            return _cell_display(value)
+        if role == Qt.ToolTipRole:
+            if not present:
+                return None
+            return _cell_tooltip(value)
+        return None
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole:
