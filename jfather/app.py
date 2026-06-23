@@ -12,20 +12,24 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QSplitter,
+    QStackedWidget,
+    QTableView,
     QToolBar,
     QTreeView,
     QVBoxLayout,
     QWidget,
 )
 
-from . import jsontools, query, search, theme
+from . import jsontools, paths, query, search, theme
+from .breadcrumb import Breadcrumb
 from .document import DocumentManager
 from .editor import JsonEditor
 from .find_bar import FindBar
 from .query_panel import QueryPanel
 from .search_bar import SearchBar
 from .sidebar import DocumentSidebar
-from .tree_model import JsonTreeModel, index_for_path
+from .table_model import JsonTableModel, is_tabular
+from .tree_model import JsonTreeModel, index_for_path, path_for_index
 
 
 class MainWindow(QMainWindow):
@@ -37,6 +41,7 @@ class MainWindow(QMainWindow):
 
         self.manager = DocumentManager()
         self.tree_model = JsonTreeModel({})
+        self.table_model = JsonTableModel([])
         self._search_results = []
         self._search_pos = -1
 
@@ -78,6 +83,18 @@ class MainWindow(QMainWindow):
 
         self.tree = QTreeView()
         self.tree.setModel(self.tree_model)
+        self.tree.doubleClicked.connect(self._on_tree_double_clicked)
+
+        self.table = QTableView()
+        self.table.setModel(self.table_model)
+        self.table.doubleClicked.connect(self._on_table_double_clicked)
+
+        self.view_stack = QStackedWidget()
+        self.view_stack.addWidget(self.tree)
+        self.view_stack.addWidget(self.table)
+
+        self.breadcrumb = Breadcrumb()
+        self.breadcrumb.pathChanged.connect(self.focus_path)
 
         self.search_bar = SearchBar()
         self.search_bar.queryChanged.connect(self._on_search)
@@ -87,15 +104,16 @@ class MainWindow(QMainWindow):
         tree_pane = QWidget()
         tree_layout = QVBoxLayout(tree_pane)
         tree_layout.setContentsMargins(0, 0, 0, 0)
+        tree_layout.addWidget(self.breadcrumb)
         tree_layout.addWidget(self.search_bar)
-        tree_layout.addWidget(self.tree)
+        tree_layout.addWidget(self.view_stack)
 
         center_split = QSplitter(Qt.Horizontal)
         center_split.addWidget(editor_pane)
         center_split.addWidget(tree_pane)
         center_split.setSizes([600, 600])
 
-        self.query_panel = QueryPanel()
+        self.query_panel = QueryPanel(get_field_names=self._field_names)
         self.query_panel.runRequested.connect(self.run_query)
 
         right_split = QSplitter(Qt.Vertical)
@@ -220,7 +238,7 @@ class MainWindow(QMainWindow):
             return
         self.editor.set_text(doc.text)
         self.query_panel.set_rows(doc.query_rows)
-        self.refresh_tree()
+        self._refresh_view()
         self.search_bar.input.setText(doc.search_term)
 
     def _refresh_sidebar(self):
@@ -236,17 +254,76 @@ class MainWindow(QMainWindow):
         self._debounce.start()
 
     def sync_from_editor(self):
-        self.refresh_tree()
+        self._refresh_view()
 
-    def refresh_tree(self):
+    def _field_names(self):
+        value = self.focused_value()
+        names = []
+        seen = set()
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    for key in item.keys():
+                        if key not in seen:
+                            seen.add(key)
+                            names.append(key)
+        elif isinstance(value, dict):
+            names = list(value.keys())
+        return names
+
+    def focused_value(self):
+        try:
+            data = jsontools.parse(self.editor.text())
+        except ValueError:
+            return None
+        doc = self.manager.active
+        path = doc.focus_path if doc is not None else []
+        value, valid = paths.resolve_or_nearest(data, path)
+        if doc is not None and valid != path:
+            doc.focus_path = valid
+        return value
+
+    def focus_path(self, path):
+        doc = self.manager.active
+        if doc is not None:
+            doc.focus_path = list(path)
+        self._refresh_view()
+
+    def _refresh_view(self):
         ok, message, line, col = jsontools.validate(self.editor.text())
-        if ok:
-            self.tree_model.set_json(jsontools.parse(self.editor.text()))
-            self.status_label.setText("Valid JSON")
-        else:
+        if not ok:
             self.status_label.setText(
                 f"Invalid JSON: {message} (line {line}, col {col})"
             )
+            return
+        self.status_label.setText("Valid JSON")
+        value = self.focused_value()
+        doc = self.manager.active
+        self.breadcrumb.set_path(doc.focus_path if doc is not None else [])
+        if is_tabular(value):
+            self.table_model.set_rows(value)
+            self.view_stack.setCurrentWidget(self.table)
+        else:
+            self.tree_model.set_json(value if value is not None else {})
+            self.view_stack.setCurrentWidget(self.tree)
+        is_array = isinstance(value, list)
+        self.query_panel.set_run_enabled(is_array)
+        if not is_array:
+            self.query_panel.set_results_text("Focus an array to query.")
+
+    def _on_tree_double_clicked(self, index):
+        node = index.internalPointer()
+        if node is None or not node.is_container:
+            return
+        rel = path_for_index(index)
+        doc = self.manager.active
+        base = list(doc.focus_path) if doc is not None else []
+        self.focus_path(base + rel)
+
+    def _on_table_double_clicked(self, index):
+        doc = self.manager.active
+        base = list(doc.focus_path) if doc is not None else []
+        self.focus_path(base + [index.row()])
 
     def current_text(self):
         return self.editor.text()
@@ -287,17 +364,20 @@ class MainWindow(QMainWindow):
             doc.search_term = term
         self._search_results = []
         self._search_pos = -1
-        if term:
-            try:
-                data = jsontools.parse(self.editor.text())
-            except ValueError:
-                data = None
-            if data is not None:
-                self._search_results = search.search(data, term)
+        value = self.focused_value()
+        if term and value is not None:
+            if self.view_stack.currentWidget() is self.table:
+                self._search_results = [
+                    [row]
+                    for row in range(self.table_model.rowCount())
+                    if search.search(self.table_model.row_object(row), term)
+                ]
+            else:
+                self._search_results = search.search(value, term)
         if self._search_results:
             self._navigate_search(1)
         else:
-            self.search_bar.set_count(0, len(self._search_results))
+            self.search_bar.set_count(0, 0)
 
     def _navigate_search(self, step):
         total = len(self._search_results)
@@ -305,11 +385,16 @@ class MainWindow(QMainWindow):
             self.search_bar.set_count(0, 0)
             return
         self._search_pos = (self._search_pos + step) % total
-        path = self._search_results[self._search_pos]
-        index = index_for_path(self.tree_model, path)
-        if index.isValid():
-            self.tree.setCurrentIndex(index)
-            self.tree.scrollTo(index)
+        target = self._search_results[self._search_pos]
+        if self.view_stack.currentWidget() is self.table:
+            index = self.table_model.index(target[0], 0)
+            self.table.setCurrentIndex(index)
+            self.table.scrollTo(index)
+        else:
+            index = index_for_path(self.tree_model, target)
+            if index.isValid():
+                self.tree.setCurrentIndex(index)
+                self.tree.scrollTo(index)
         self.search_bar.set_count(self._search_pos + 1, total)
 
     # ---- Tools -----------------------------------------------------------
@@ -345,28 +430,14 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(theme.STYLESHEET if self._dark else theme.LIGHT_STYLESHEET)
 
     # ---- Query -----------------------------------------------------------
-    def query_target(self):
-        selection = self.tree.selectionModel()
-        indexes = selection.selectedIndexes() if selection else []
-        for index in indexes:
-            node = index.internalPointer()
-            if node is not None and isinstance(node.value, list):
-                return node.value
-        try:
-            data = jsontools.parse(self.editor.text())
-        except ValueError:
-            return None
-        return data if isinstance(data, list) else None
-
-    def run_query(self, raw_rows=None):
-        if raw_rows is None:
-            raw_rows = self.query_panel.rows()
-        target = self.query_target()
-        if not isinstance(target, list):
-            self.query_panel.set_results_text("Query target must be a JSON array.")
+    def run_query(self):
+        value = self.focused_value()
+        if not isinstance(value, list):
+            self.query_panel.set_results_text("Focus an array to query.")
             return []
         try:
-            results = query.build_query(target, raw_rows)
+            rows = self.query_panel.current_rows()
+            results = query.run_query(value, rows)
         except (ValueError, TypeError) as exc:
             self.query_panel.set_results_text(f"Query error: {exc}")
             return []

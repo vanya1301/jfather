@@ -39,15 +39,17 @@ def test_run_query_on_root_array(app):
     win = MainWindow()
     win.editor.set_text(json.dumps([{"id": 1}, {"id": 2}, {"id": 3}]))
     win.sync_from_editor()
-    results = win.run_query([("filter", "id__gt=1")])
+    win.query_panel.set_mode("text")
+    win.query_panel.set_rows([("filter", "id__gt=1")])
+    results = win.run_query()
     assert results == [{"id": 2}, {"id": 3}]
 
 
-def test_query_target_falls_back_to_root(app):
+def test_focused_value_defaults_to_root(app):
     win = MainWindow()
     win.editor.set_text(json.dumps([{"id": 1}]))
     win.sync_from_editor()
-    assert win.query_target() == [{"id": 1}]
+    assert win.focused_value() == [{"id": 1}]
 
 
 def test_search_finds_and_selects_match(app):
@@ -95,3 +97,64 @@ def test_find_counts_and_navigates(app):
     win.toggle_find()
     win._find("X")
     assert win.find_bar.count_label.text().endswith("/3")
+
+
+def test_table_view_for_array_of_objects(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([{"id": 1}, {"id": 2}]))
+    win.sync_from_editor()
+    assert win.view_stack.currentWidget() is win.table
+    assert win.table_model.rowCount() == 2
+
+
+def test_tree_view_for_object(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"a": 1}))
+    win.sync_from_editor()
+    assert win.view_stack.currentWidget() is win.tree
+
+
+def test_focus_drills_into_nested_array(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"users": [{"id": 1}, {"id": 2}]}))
+    win.sync_from_editor()
+    win.focus_path(["users"])
+    assert win.focused_value() == [{"id": 1}, {"id": 2}]
+    assert win.view_stack.currentWidget() is win.table
+
+
+def test_query_runs_against_focused_array(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"users": [{"id": 1}, {"id": 2}, {"id": 3}]}))
+    win.sync_from_editor()
+    win.focus_path(["users"])
+    win.query_panel.set_mode("text")
+    win.query_panel.set_rows([("filter", "id__gt=1")])
+    results = win.run_query()
+    assert results == [{"id": 2}, {"id": 3}]
+
+
+def test_query_disabled_when_focus_not_array(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"a": {"b": 1}}))
+    win.sync_from_editor()
+    win.focus_path(["a"])
+    assert win.query_panel.run_button.isEnabled() is False
+
+
+def test_stale_focus_path_heals(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"users": [{"id": 1}]}))
+    win.sync_from_editor()
+    win.focus_path(["users", 5])
+    assert win.focused_value() == [{"id": 1}]
+    assert win.manager.active.focus_path == ["users"]
+
+
+def test_table_search_selects_row(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([{"name": "Alice"}, {"name": "Bob"}]))
+    win.sync_from_editor()
+    win.search_bar.input.setText("Bob")
+    assert win.table.currentIndex().row() == 1
+    assert win.search_bar.count_label.text() == "1/1"

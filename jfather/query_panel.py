@@ -1,6 +1,6 @@
 """Collection-query builder panel with structured and text modes."""
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
@@ -28,7 +28,7 @@ class _TextRow(QWidget):
         self.tokens.setPlaceholderText("field__lookup=value  field2=value2")
         if field_names:
             completer = QCompleter(list(field_names))
-            completer.setCaseSensitivity(False)
+            completer.setCaseSensitivity(Qt.CaseInsensitive)
             self.tokens.setCompleter(completer)
         layout.addWidget(self.op)
         layout.addWidget(self.tokens)
