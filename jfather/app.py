@@ -49,7 +49,8 @@ def _flatten_keys(obj, prefix="", depth=0, max_depth=5):
     """Yield `field` and nested `parent__child` paths for a dict's keys.
 
     Mirrors collection-query's `__` traversal: only descends into nested dicts
-    (not lists), so suggested paths are queryable.
+    (not lists), so suggested paths are queryable. `max_depth` caps only the
+    *suggestions*; deeper paths typed by hand are still resolved and queried.
     """
     paths = []
     if not isinstance(obj, dict):
