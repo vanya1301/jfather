@@ -51,6 +51,11 @@ LOOKUP_LABELS = {
 }
 
 
+# Extra popup width beyond the longest label: item padding + check indicator
+# + scrollbar, so readable labels are never clipped.
+_POPUP_PADDING_PX = 64
+
+
 def _lookup_label(key):
     """Readable label for a lookup key, falling back to the raw key."""
     return LOOKUP_LABELS.get(key, key)
@@ -72,8 +77,7 @@ def _fit_popup_to_contents(combo):
         key=len,
         default="",
     )
-    # Extra room for item padding, the check indicator, and the scrollbar.
-    view.setMinimumWidth(metrics.horizontalAdvance(longest) + 64)
+    view.setMinimumWidth(metrics.horizontalAdvance(longest) + _POPUP_PADDING_PX)
 
 
 class _TextRow(QWidget):
