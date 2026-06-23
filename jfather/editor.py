@@ -1,14 +1,15 @@
 """JSON text editor with syntax highlighting."""
 
-from PySide6.QtCore import QRegularExpression
+from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QPainter,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextCursor,
 )
-from PySide6.QtWidgets import QPlainTextEdit, QTextEdit
+from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
 
 def _fmt(color, bold=False):
@@ -45,6 +46,18 @@ class JsonHighlighter(QSyntaxHighlighter):
             self.setFormat(match.capturedStart(), match.capturedLength(), self._key_format)
 
 
+class LineNumberArea(QWidget):
+    def __init__(self, editor):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self):
+        return QSize(self._editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event):
+        self._editor.paint_line_numbers(event)
+
+
 class JsonEditor(QPlainTextEdit):
     """Plain-text JSON editor with monospace font and highlighting."""
 
@@ -54,6 +67,10 @@ class JsonEditor(QPlainTextEdit):
         font.setStyleHint(QFont.Monospace)
         font.setPointSize(12)
         self.setFont(font)
+        self.line_number_area = LineNumberArea(self)
+        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self.updateRequest.connect(self._update_line_number_area)
+        self._update_line_number_area_width(0)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.highlighter = JsonHighlighter(self.document())
         self._match_cursors = []
@@ -99,3 +116,47 @@ class JsonEditor(QPlainTextEdit):
         self._match_cursors = []
         self._find_index = -1
         self.setExtraSelections([])
+
+    def line_number_area_width(self):
+        digits = max(2, len(str(max(1, self.blockCount()))))
+        return 14 + self.fontMetrics().horizontalAdvance("9") * digits
+
+    def _update_line_number_area_width(self, _count):
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def _update_line_number_area(self, rect, dy):
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(
+                0, rect.y(), self.line_number_area.width(), rect.height()
+            )
+        if rect.contains(self.viewport().rect()):
+            self._update_line_number_area_width(0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(
+            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        )
+
+    def paint_line_numbers(self, event):
+        painter = QPainter(self.line_number_area)
+        painter.fillRect(event.rect(), QColor("#161514"))
+        painter.setPen(QColor("#5b554d"))
+        block = self.firstVisibleBlock()
+        number = block.blockNumber()
+        top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        bottom = top + self.blockBoundingRect(block).height()
+        width = self.line_number_area.width() - 6
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                painter.drawText(
+                    0, int(top), width, self.fontMetrics().height(),
+                    Qt.AlignRight, str(number + 1),
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + self.blockBoundingRect(block).height()
+            number += 1

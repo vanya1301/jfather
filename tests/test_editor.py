@@ -57,3 +57,16 @@ def test_clear_find(app):
     editor.clear_find()
     assert editor.extraSelections() == []
     assert editor.find_next() == 0
+
+
+def test_line_number_area_width_positive(app):
+    from jfather.editor import JsonEditor
+    ed = JsonEditor()
+    ed.set_text("{\n  \"a\": 1\n}")
+    assert ed.line_number_area_width() > 0
+
+
+def test_line_number_area_widget_exists(app):
+    from jfather.editor import JsonEditor
+    ed = JsonEditor()
+    assert ed.line_number_area is not None
