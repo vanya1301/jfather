@@ -31,6 +31,15 @@ def test_minify_json():
     assert jsontools.minify_json('{\n  "a": 1\n}') == '{"a":1}'
 
 
+def test_minify_preserves_unicode():
+    assert jsontools.minify_json('{"a": "\u00e9"}') == '{"a":"\u00e9"}'
+
+
+def test_parse_raises_on_invalid():
+    with pytest.raises(json.JSONDecodeError):
+        jsontools.parse("{")
+
+
 def test_escape_string_wraps_and_escapes():
     assert jsontools.escape_string('he said "hi"\n') == '"he said \\"hi\\"\\n"'
 
