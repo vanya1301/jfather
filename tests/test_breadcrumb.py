@@ -36,3 +36,19 @@ def test_click_root_emits_empty(app):
     bar.pathChanged.connect(seen.append)
     bar.buttons[0].click()
     assert seen[-1] == []
+
+
+def test_crumbs_are_pills(app):
+    bar = Breadcrumb()
+    bar.set_path(["users"])
+    assert all(b.objectName() == "breadcrumbPill" for b in bar.buttons)
+
+
+def test_hint_visible_only_at_root(app):
+    bar = Breadcrumb()
+    bar.show()
+    bar.set_path([])
+    assert bar.hint.text() == "Double-click a row or node to focus"
+    assert bar.hint.isVisible() is True
+    bar.set_path(["users"])
+    assert bar.hint.isVisible() is False

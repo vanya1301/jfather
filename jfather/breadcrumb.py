@@ -11,6 +11,9 @@ class Breadcrumb(QWidget):
         super().__init__(parent)
         self._path = []
         self.buttons = []
+        self.hint = QLabel("Double-click a row or node to focus")
+        self.hint.setObjectName("drillHint")
+        self.hint.hide()
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(4, 2, 4, 2)
         self._layout.setSpacing(2)
@@ -24,7 +27,7 @@ class Breadcrumb(QWidget):
         while self._layout.count():
             item = self._layout.takeAt(0)
             widget = item.widget()
-            if widget is not None:
+            if widget is not None and widget is not self.hint:
                 widget.deleteLater()
 
     def set_path(self, path):
@@ -40,10 +43,13 @@ class Breadcrumb(QWidget):
             if position > 0:
                 self._layout.addWidget(QLabel("\u203a"))
             button = QPushButton(label)
+            button.setObjectName("breadcrumbPill")
             button.setFlat(True)
             button.clicked.connect(
                 lambda _checked=False, t=target: self.pathChanged.emit(t)
             )
             self.buttons.append(button)
             self._layout.addWidget(button)
+        self.hint.setVisible(len(self._path) == 0)
+        self._layout.addWidget(self.hint)
         self._layout.addStretch()
