@@ -1,5 +1,6 @@
 import json
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from jfather.app import MainWindow
 
@@ -158,3 +159,25 @@ def test_table_search_selects_row(app):
     win.search_bar.input.setText("Bob")
     assert win.table.currentIndex().row() == 1
     assert win.search_bar.count_label.text() == "1/1"
+
+
+def test_table_sort_keeps_source_mapping(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([{"id": 2}, {"id": 1}, {"id": 3}]))
+    win.sync_from_editor()
+    # sort ascending by column 0
+    win.table.sortByColumn(0, Qt.AscendingOrder)
+    # search should still select the correct source row via proxy mapping
+    win.search_bar.input.setText("3")
+    assert win.search_bar.count_label.text() == "1/1"
+    src_row = win.table_proxy.mapToSource(win.table.currentIndex()).row()
+    assert win.table_model.row_object(src_row) == {"id": 3}
+
+
+def test_table_uses_monospace_font(app):
+    from jfather import theme
+    win = MainWindow()
+    win.editor.set_text(json.dumps([{"id": 1}]))
+    win.sync_from_editor()
+    fam = theme.MONO_FONT_FAMILY.split(",")[0].strip()
+    assert win.table.font().family() == fam

@@ -3,8 +3,8 @@
 import json
 import sys
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QTimer
+from PySide6.QtGui import QAction, QFont, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -85,9 +85,29 @@ class MainWindow(QMainWindow):
         self.tree.setModel(self.tree_model)
         self.tree.doubleClicked.connect(self._on_tree_double_clicked)
 
+        self.table_proxy = QSortFilterProxyModel()
+        self.table_proxy.setSourceModel(self.table_model)
         self.table = QTableView()
-        self.table.setModel(self.table_model)
+        self.table.setModel(self.table_proxy)
+        self.table.setSortingEnabled(True)
+        # Start unsorted (identity proxy mapping); user can sort interactively.
+        self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
+        self.table_proxy.sort(-1)
         self.table.doubleClicked.connect(self._on_table_double_clicked)
+        header = self.table.horizontalHeader()
+        header.setSectionsMovable(True)
+        header.setStretchLastSection(True)
+        # Render cell DATA monospace while keeping column HEADERS sans-serif.
+        # A widget-level stylesheet is required here because the app-wide
+        # stylesheet sets a font-family on QTableView, which overrides setFont().
+        mono = QFont()
+        mono.setFamily(theme.MONO_FONT_FAMILY.split(",")[0].strip())
+        mono.setStyleHint(QFont.Monospace)
+        self.table.setFont(mono)
+        self.table.setStyleSheet(
+            f"QTableView {{ font-family: {theme.MONO_FONT_FAMILY}; }}"
+            f"QHeaderView::section {{ font-family: {theme.UI_FONT_FAMILY}; }}"
+        )
 
         self.view_stack = QStackedWidget()
         self.view_stack.addWidget(self.tree)
@@ -321,9 +341,10 @@ class MainWindow(QMainWindow):
         self.focus_path(base + rel)
 
     def _on_table_double_clicked(self, index):
+        source_index = self.table_proxy.mapToSource(index)
         doc = self.manager.active
         base = list(doc.focus_path) if doc is not None else []
-        self.focus_path(base + [index.row()])
+        self.focus_path(base + [source_index.row()])
 
     def current_text(self):
         return self.editor.text()
@@ -387,7 +408,8 @@ class MainWindow(QMainWindow):
         self._search_pos = (self._search_pos + step) % total
         target = self._search_results[self._search_pos]
         if self.view_stack.currentWidget() is self.table:
-            index = self.table_model.index(target[0], 0)
+            source_index = self.table_model.index(target[0], 0)
+            index = self.table_proxy.mapFromSource(source_index)
             self.table.setCurrentIndex(index)
             self.table.scrollTo(index)
         else:
