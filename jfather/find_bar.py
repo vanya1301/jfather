@@ -31,10 +31,11 @@ class FindBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(6)
 
         self.input = _FindInput()
-        self.input.setPlaceholderText("Find\u2026")
+        self.input.setPlaceholderText("Find in file\u2026")
         self.input.textChanged.connect(self.queryChanged.emit)
         self.input.escapePressed.connect(self.closed.emit)
         self.input.findNext.connect(self.nextRequested.emit)

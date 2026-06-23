@@ -53,3 +53,9 @@ def test_set_count(app):
     bar = FindBar()
     bar.set_count(2, 5)
     assert bar.count_label.text() == "2/5"
+
+
+def test_placeholder_text(app):
+    from jfather.find_bar import FindBar
+    bar = FindBar()
+    assert bar.input.placeholderText() == "Find in file\u2026"
