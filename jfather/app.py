@@ -31,6 +31,8 @@ from .search_bar import SearchBar
 from .sidebar import DocumentSidebar
 from .table_model import JsonTableModel, is_tabular
 from .tree_model import JsonTreeModel, index_for_path, path_for_index
+from .updater import check_for_updates
+from .update_dialog import UpdateDialog
 
 
 _MISSING = object()
@@ -88,6 +90,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_toolbar()
+        self._build_menu_bar()
         self.setStyleSheet(theme.STYLESHEET)
 
         self.manager.new()
@@ -99,6 +102,8 @@ class MainWindow(QMainWindow):
         self._debounce.setSingleShot(True)
         self._debounce.timeout.connect(self.sync_from_editor)
         self.editor.textChanged.connect(self._on_editor_changed)
+        
+        self.check_for_updates_on_startup()
 
     # ---- UI construction -------------------------------------------------
     def _build_ui(self):
@@ -240,6 +245,77 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda _checked=False, h=handler: h())
             self.addAction(action)
             self.shortcut_actions[name] = action
+
+    def _build_menu_bar(self):
+        """Build the menu bar with Help menu"""
+        # Help menu
+        help_menu = self.menuBar().addMenu("Help")
+        
+        # Check for Updates action
+        self.check_for_updates_action = help_menu.addAction("Check for Updates...")
+        self.check_for_updates_action.triggered.connect(self.on_check_for_updates)
+        
+        # About action
+        about_action = help_menu.addAction("About")
+        about_action.triggered.connect(self.on_about)
+
+    def on_check_for_updates(self):
+        """Handle Check for Updates menu action"""
+        from jfather import __version__
+        
+        release_info = check_for_updates(__version__)
+        dialog = UpdateDialog(__version__, release_info, self)
+        dialog.exec()
+
+    def check_for_updates_on_startup(self):
+        """Check for updates on startup (cached)"""
+        # Only check once per hour
+        import time
+        import os
+        
+        cache_file = os.path.expanduser("~/.jfather_update_check")
+        check_needed = True
+        
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r') as f:
+                    last_check = float(f.read().strip())
+                if time.time() - last_check < 3600:  # 1 hour
+                    check_needed = False
+            except (IOError, ValueError, OSError):
+                # If we can't read the cache, just check for updates
+                pass
+        
+        if check_needed:
+            try:
+                from jfather import __version__
+                release_info = check_for_updates(__version__)
+                if release_info:
+                    # Show update dialog after a short delay
+                    QTimer.singleShot(2000, lambda: self.show_update_dialog(release_info))
+            finally:
+                # Update cache
+                try:
+                    with open(cache_file, 'w') as f:
+                        f.write(str(time.time()))
+                except (IOError, OSError):
+                    # If we can't write the cache, continue anyway
+                    pass
+
+    def show_update_dialog(self, release_info):
+        """Show update dialog if update available"""
+        from jfather import __version__
+        dialog = UpdateDialog(__version__, release_info, self)
+        dialog.exec()
+
+    def on_about(self):
+        """Show About dialog"""
+        from jfather import __version__
+        from PySide6.QtWidgets import QMessageBox
+        
+        QMessageBox.about(self, "About jfather",
+                          f"jfather {__version__}\n\n"
+                          "A fast, modern desktop app to view and edit large JSON.")
 
     # ---- Document lifecycle ---------------------------------------------
     def new_document(self):
