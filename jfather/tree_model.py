@@ -74,6 +74,19 @@ def index_for_path(model, path):
     return parent
 
 
+def path_for_index(index):
+    """Return the absolute path (keys/indices) for a tree index's node."""
+    if not index.isValid():
+        return []
+    path = []
+    node = index.internalPointer()
+    while node is not None and node.parent is not None:
+        path.append(node.key)
+        node = node.parent
+    path.reverse()
+    return path
+
+
 def _value_text(value):
     if isinstance(value, dict):
         return "{%d items}" % len(value)

@@ -60,3 +60,17 @@ def test_set_json_resets():
     model = JsonTreeModel({"a": 1})
     model.set_json([1, 2])
     assert model.rowCount(QModelIndex()) == 2
+
+
+def test_path_for_index_nested():
+    from jfather.tree_model import path_for_index
+    model = JsonTreeModel({"users": [{"name": "Bob"}]})
+    users = model.index(0, 0, QModelIndex())
+    first = model.index(0, 0, users)
+    name = model.index(0, 0, first)
+    assert path_for_index(name) == ["users", 0, "name"]
+
+
+def test_path_for_index_invalid_is_empty():
+    from jfather.tree_model import path_for_index
+    assert path_for_index(QModelIndex()) == []
