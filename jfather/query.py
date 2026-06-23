@@ -56,6 +56,19 @@ def parse_tokens(text):
     return dict(parse_token(tok) for tok in text.split())
 
 
+def split_key(key, lookups):
+    """Split 'field__lookup' into (field, lookup).
+
+    The last '__' segment is treated as a lookup only when it is a known
+    lookup name; otherwise the whole key is a (possibly nested) field and the
+    lookup is 'exact'.
+    """
+    parts = key.split("__")
+    if len(parts) > 1 and parts[-1] in lookups:
+        return "__".join(parts[:-1]), parts[-1]
+    return key, "exact"
+
+
 def run_query(data, rows):
     """Run filter/exclude rows against list data and return the result list.
 

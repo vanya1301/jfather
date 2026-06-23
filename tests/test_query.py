@@ -80,3 +80,22 @@ def test_available_lookups_exposed():
     lookups = query.available_lookups()
     assert "contains" in lookups
     assert "gt" in lookups
+
+
+def test_split_key_with_lookup():
+    lookups = query.available_lookups()
+    assert query.split_key("id__gt", lookups) == ("id", "gt")
+
+
+def test_split_key_nested_no_lookup():
+    lookups = query.available_lookups()
+    assert query.split_key("dept__name", lookups) == ("dept__name", "exact")
+
+
+def test_split_key_nested_with_lookup():
+    lookups = query.available_lookups()
+    assert query.split_key("dept__name__contains", lookups) == ("dept__name", "contains")
+
+
+def test_split_key_plain():
+    assert query.split_key("name", query.available_lookups()) == ("name", "exact")
