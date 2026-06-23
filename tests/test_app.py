@@ -65,3 +65,33 @@ def test_search_no_match_shows_zero(app):
     win.sync_from_editor()
     win.search_bar.input.setText("zzz")
     assert win.search_bar.count_label.text() == "0/0"
+
+
+def test_shortcuts_registered(app):
+    from PySide6.QtGui import QKeySequence
+    win = MainWindow()
+    seqs = {name: act.shortcut() for name, act in win.shortcut_actions.items()}
+    assert seqs["save"] == QKeySequence(QKeySequence.Save)
+    assert seqs["close"] == QKeySequence(QKeySequence.Close)
+    assert seqs["find"] == QKeySequence(QKeySequence.Find)
+    assert seqs["format"] == QKeySequence("Ctrl+Shift+F")
+    assert seqs["run"] == QKeySequence("Ctrl+Return")
+
+
+def test_toggle_find_shows_and_hides(app):
+    win = MainWindow()
+    win.show()
+    assert win.find_bar.isVisible() is False
+    win.toggle_find()
+    assert win.find_bar.isVisible() is True
+    win._close_find()
+    assert win.find_bar.isVisible() is False
+
+
+def test_find_counts_and_navigates(app):
+    win = MainWindow()
+    win.show()
+    win.editor.set_text("X X X")
+    win.toggle_find()
+    win._find("X")
+    assert win.find_bar.count_label.text().endswith("/3")
