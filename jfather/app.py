@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QSplitter,
     QStackedWidget,
     QTableView,
@@ -37,7 +38,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("jfather")
         self.resize(1200, 800)
-        self._dark = True
 
         self.manager = DocumentManager()
         self.tree_model = JsonTreeModel({})
@@ -157,17 +157,31 @@ class MainWindow(QMainWindow):
 
     def _build_toolbar(self):
         bar = QToolBar()
+        bar.setMovable(False)
         self.addToolBar(bar)
-        bar.addAction("New", self.new_document)
-        bar.addAction("Open", self.open_file)
-        bar.addSeparator()
-        bar.addAction("Minify", self.apply_minify)
-        bar.addAction("Escape", self.apply_escape)
-        bar.addAction("Unescape", self.apply_unescape)
-        bar.addSeparator()
-        bar.addAction("Theme", self.toggle_theme)
+
+        # FILE group
+        bar.addAction("\U0001F4C4 New", self.new_document)
+        bar.addAction("\U0001F4C2 Open", self.open_file)
+        self._save_action = bar.addAction("\U0001F4BE Save", self.save_file)
         bar.addSeparator()
 
+        # TRANSFORM group
+        self._format_action = bar.addAction("\u2728 Format", self.apply_format)
+        bar.addAction("\U0001F5DC Minify", self.apply_minify)
+        bar.addAction("\u2937 Escape", self.apply_escape)
+        bar.addAction("\u2936 Unescape", self.apply_unescape)
+
+        # spacer pushes SETTINGS group to the far right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        bar.addWidget(spacer)
+
+        # SETTINGS group
+        bar.addSeparator()
+        self._close_action = bar.addAction("\u2715 Close", self._close_active_document)
+
+        # Hidden shortcut actions (keep keyboard bindings + tests intact)
         self.shortcut_actions = {}
         specs = [
             ("close", QKeySequence(QKeySequence.Close), self._close_active_document),
@@ -181,7 +195,6 @@ class MainWindow(QMainWindow):
             action.setShortcut(sequence)
             action.triggered.connect(lambda _checked=False, h=handler: h())
             self.addAction(action)
-            bar.addAction(action)
             self.shortcut_actions[name] = action
 
     # ---- Document lifecycle ---------------------------------------------
@@ -447,10 +460,6 @@ class MainWindow(QMainWindow):
             except ValueError as exc:
                 self.status_label.setText(f"Cannot unescape: {exc}")
 
-    def toggle_theme(self):
-        self._dark = not self._dark
-        self.setStyleSheet(theme.STYLESHEET if self._dark else theme.LIGHT_STYLESHEET)
-
     # ---- Query -----------------------------------------------------------
     def run_query(self):
         value = self.focused_value()
@@ -464,9 +473,10 @@ class MainWindow(QMainWindow):
             self.query_panel.set_results_text(f"Query error: {exc}")
             return []
         self.query_panel.set_results_text(
-            f"{len(results)} result(s)\n\n"
-            + json.dumps(results, indent=2, ensure_ascii=False)
+            json.dumps(results, indent=2, ensure_ascii=False),
+            count=len(results),
         )
+        self.status_label.setText(f"{len(results)} match(es)")
         return results
 
 

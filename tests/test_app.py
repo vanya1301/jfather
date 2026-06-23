@@ -182,3 +182,19 @@ def test_table_uses_monospace_font(app):
     win.sync_from_editor()
     fam = theme.MONO_FONT_FAMILY.split(",")[0].strip()
     assert win.table.font().family() == fam
+
+
+def test_run_query_sets_status_count(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([{"id": 1}, {"id": 2}, {"id": 3}]))
+    win.sync_from_editor()
+    win.query_panel.set_mode("text")
+    win.query_panel.set_rows([("filter", "id__gt=1")])
+    win.run_query()
+    assert "2" in win.status_label.text()
+    assert "match" in win.status_label.text().lower()
+
+
+def test_theme_toggle_removed(app):
+    win = MainWindow()
+    assert not hasattr(win, "toggle_theme")
