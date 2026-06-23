@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import query, theme
+from .editor import JsonHighlighter
 
 # Human-readable, symbol-prefixed labels shown in the operator dropdown.
 # Combo *data* keeps the raw value ("filter"/"exclude") used to build queries.
@@ -257,6 +258,7 @@ class QueryPanel(QWidget):
         mono.setStyleHint(QFont.Monospace)
         self.results.setFont(mono)
         self.results.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._results_highlighter = JsonHighlighter(self.results.document())
         layout.addWidget(self.results, 1)
 
         self.set_rows([("filter", "")])

@@ -147,6 +147,13 @@ def test_results_pane_takes_free_space(app):
     assert panel.stack.sizePolicy().verticalPolicy() == QSizePolicy.Maximum
 
 
+def test_results_pane_has_json_highlighter(app):
+    from jfather.editor import JsonHighlighter
+    panel = QueryPanel()
+    assert isinstance(panel._results_highlighter, JsonHighlighter)
+    assert panel._results_highlighter.document() is panel.results.document()
+
+
 def test_value_dropdown_offers_field_values(app):
     panel = QueryPanel(
         get_field_values=lambda f: ["Alice", "Bob"] if f == "name" else []
