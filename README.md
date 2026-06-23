@@ -77,3 +77,35 @@ remove matches; there is no OR/grouped boolean logic — use `in` (e.g.
 ```bash
 QT_QPA_PLATFORM=offscreen uv run pytest -v
 ```
+
+## Building and Releasing
+
+### Creating a Release
+
+1. Tag the release:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. GitHub Actions will automatically:
+   - Run tests on all platforms
+   - Build executables for macOS, Windows, and Linux
+   - Create a GitHub Release with all assets
+
+3. Users can download executables from the GitHub Releases page
+
+### Manual Build
+
+To build locally:
+
+```bash
+uv pip install pyinstaller
+uv run pyinstaller jfather.spec
+```
+
+Executables will be in the `dist/` directory.
+
+### Update Mechanism
+
+The app automatically checks for updates on startup (once per hour). Users can also manually check via Help > Check for Updates...
