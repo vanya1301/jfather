@@ -13,10 +13,14 @@ uv run python main.py
 ## Features
 
 - Multiple documents via the left sidebar (New / Open / Close, dirty markers).
-- Dual-pane: syntax-highlighted text editor + lazy tree view.
+- Dual-pane: syntax-highlighted text editor + data viewer.
+- Viewer shows a **table** for arrays of objects and a **tree** otherwise.
+- **Focus / drill-in**: double-click a node or table row to re-root the viewer
+  and query scope; a breadcrumb navigates back.
 - Format, Minify, Escape, Unescape (selection-aware).
-- Query the selected array (or root array) with collection-query syntax, e.g.
-  `field__lookup=value` tokens with filter/exclude rows. Lists: `a,b,c`.
+- **Query builder** with Structured (field / lookup / value dropdowns) and Text
+  (tokens with autocomplete) modes; runs against the focused array (Run is
+  disabled with a hint until the focused value is an array). Lists: `a,b,c`.
   Ranges: `lo..hi`.
   - Requires `collection-query>=0.2.0`. Supported lookups include `contains`,
     `startswith`, `endswith`, `in`, `in_range`, `lt`/`lte`/`gt`/`gte`, `not`,
@@ -24,6 +28,9 @@ uv run python main.py
     `istartswith`, `iendswith`, `iexact`, `iregex`).
   - Unknown lookups report a clear error in the results pane instead of
     silently returning nothing.
+- In-editor **Find** bar; data **search** across the active tree or table.
+- Cross-platform shortcuts: Close (Ctrl/Cmd+W), Save (Ctrl/Cmd+S),
+  Format (Ctrl/Cmd+Shift+F), Run query (Ctrl/Cmd+Return), Find (Ctrl/Cmd+F).
 
 ## Test
 
