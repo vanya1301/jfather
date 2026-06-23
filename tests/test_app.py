@@ -165,13 +165,14 @@ def test_table_sort_keeps_source_mapping(app):
     win = MainWindow()
     win.editor.set_text(json.dumps([{"id": 2}, {"id": 1}, {"id": 3}]))
     win.sync_from_editor()
-    # sort ascending by column 0
     win.table.sortByColumn(0, Qt.AscendingOrder)
-    # search should still select the correct source row via proxy mapping
-    win.search_bar.input.setText("3")
+    win.search_bar.input.setText("1")
     assert win.search_bar.count_label.text() == "1/1"
-    src_row = win.table_proxy.mapToSource(win.table.currentIndex()).row()
-    assert win.table_model.row_object(src_row) == {"id": 3}
+    current = win.table.currentIndex()
+    src_row = win.table_proxy.mapToSource(current).row()
+    assert win.table_model.row_object(src_row) == {"id": 1}
+    assert current.row() == 0          # proxy row (sorted position)
+    assert src_row == 1                # source row (insertion position) — differs, proving mapping
 
 
 def test_table_uses_monospace_font(app):
