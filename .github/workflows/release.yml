@@ -121,12 +121,6 @@ jobs:
         name: jfather-macos
         path: dist
     
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: jfather-windows.exe
-        path: dist
-    
     - name: Download Linux artifact
       uses: actions/download-artifact@v4
       with:
@@ -141,7 +135,6 @@ jobs:
       with:
         files: |
           dist/jfather-macos
-          dist/jfather-windows.exe
           dist/jfather-linux
         generate_release_notes: true
         draft: false
