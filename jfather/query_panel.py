@@ -10,12 +10,70 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from . import query, theme
+
+# Human-readable, symbol-prefixed labels shown in the operator dropdown.
+# Combo *data* keeps the raw value ("filter"/"exclude") used to build queries.
+OP_LABELS = {
+    "filter": "\u2713 Filter",
+    "exclude": "\u2715 Exclude",
+}
+
+# Human-readable, symbol-prefixed labels shown in the lookup dropdown.
+# Combo *data* keeps the raw lookup key ("gt", "icontains", ...) so query
+# building and persistence are unchanged.
+LOOKUP_LABELS = {
+    "exact": "= Equals",
+    "iexact": "\u2248 Equals (ignore case)",
+    "contains": "\u220b Contains",
+    "icontains": "\u220b Contains (ignore case)",
+    "startswith": "^ Starts with",
+    "istartswith": "^ Starts with (ignore case)",
+    "endswith": "$ Ends with",
+    "iendswith": "$ Ends with (ignore case)",
+    "regex": ".* Matches regex",
+    "iregex": ".* Matches regex (ignore case)",
+    "gt": "> Greater than",
+    "gte": "\u2265 Greater than or equal",
+    "lt": "< Less than",
+    "lte": "\u2264 Less than or equal",
+    "not": "\u2260 Not equal",
+    "in": "\u2208 In list",
+    "in_range": "\u2194 In range",
+    "exists": "\u2203 Exists",
+    "isnull": "\u2205 Is null",
+}
+
+
+def _lookup_label(key):
+    """Readable label for a lookup key, falling back to the raw key."""
+    return LOOKUP_LABELS.get(key, key)
+
+
+def _select_data(combo, value):
+    """Select the combo entry whose data == value (index 0 if not found)."""
+    index = combo.findData(value)
+    combo.setCurrentIndex(index if index >= 0 else 0)
+
+
+def _fit_popup_to_contents(combo):
+    """Widen the dropdown popup so long labels are not clipped/elided."""
+    view = combo.view()
+    view.setTextElideMode(Qt.ElideNone)
+    metrics = combo.fontMetrics()
+    longest = max(
+        (combo.itemText(i) for i in range(combo.count())),
+        key=len,
+        default="",
+    )
+    # Extra room for item padding, the check indicator, and the scrollbar.
+    view.setMinimumWidth(metrics.horizontalAdvance(longest) + 64)
 
 
 class _TextRow(QWidget):
@@ -24,8 +82,10 @@ class _TextRow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.op = QComboBox()
-        self.op.addItems(["filter", "exclude"])
-        self.op.setCurrentText(op)
+        for value in ("filter", "exclude"):
+            self.op.addItem(OP_LABELS[value], value)
+        _select_data(self.op, op)
+        _fit_popup_to_contents(self.op)
         self.tokens = QLineEdit(text)
         self.tokens.setPlaceholderText("field__lookup=value  field2=value2")
         if field_names:
@@ -43,7 +103,7 @@ class _TextRow(QWidget):
         layout.addWidget(self.remove)
 
     def as_text(self):
-        return (self.op.currentText(), self.tokens.text())
+        return (self.op.currentData(), self.tokens.text())
 
 
 class _StructuredRow(QWidget):
@@ -53,16 +113,21 @@ class _StructuredRow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.op = QComboBox()
-        self.op.addItems(["filter", "exclude"])
-        self.op.setCurrentText(op)
+        for op_value in ("filter", "exclude"):
+            self.op.addItem(OP_LABELS[op_value], op_value)
+        _select_data(self.op, op)
+        _fit_popup_to_contents(self.op)
         self.field = QComboBox()
         self.field.setEditable(True)
         if field_names:
             self.field.addItems(list(field_names))
         self.field.setCurrentText(field)
+        _fit_popup_to_contents(self.field)
         self.lookup = QComboBox()
-        self.lookup.addItems(["exact"] + list(lookups or []))
-        self.lookup.setCurrentText(lookup)
+        for lookup_value in ["exact"] + list(lookups or []):
+            self.lookup.addItem(_lookup_label(lookup_value), lookup_value)
+        _select_data(self.lookup, lookup)
+        _fit_popup_to_contents(self.lookup)
         self.value = QLineEdit(value)
         self.value.setPlaceholderText("value")
         self.remove = QPushButton("\u2212")
@@ -75,14 +140,14 @@ class _StructuredRow(QWidget):
 
     def _key(self):
         field = self.field.currentText().strip()
-        lookup = self.lookup.currentText()
+        lookup = self.lookup.currentData()
         return field if lookup == "exact" else f"{field}__{lookup}"
 
     def as_text(self):
-        return (self.op.currentText(), f"{self._key()}={self.value.text()}")
+        return (self.op.currentData(), f"{self._key()}={self.value.text()}")
 
     def as_kwargs(self):
-        return (self.op.currentText(),
+        return (self.op.currentData(),
                 {self._key(): query.coerce_value(self.value.text())})
 
 
@@ -123,6 +188,9 @@ class QueryPanel(QWidget):
         self._text_layout.setContentsMargins(0, 0, 0, 0)
         self.stack.addWidget(self._structured_page)
         self.stack.addWidget(self._text_page)
+        # The condition builder keeps its natural height; extra vertical space
+        # from the splitter goes to the results pane, not the row editor.
+        self.stack.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         layout.addWidget(self.stack)
 
         buttons = QHBoxLayout()
@@ -151,7 +219,8 @@ class QueryPanel(QWidget):
         mono.setFamily(theme.MONO_FONT_FAMILY.split(",")[0].strip())
         mono.setStyleHint(QFont.Monospace)
         self.results.setFont(mono)
-        layout.addWidget(self.results)
+        self.results.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(self.results, 1)
 
         self.set_rows([("filter", "")])
 

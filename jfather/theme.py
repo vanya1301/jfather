@@ -39,6 +39,17 @@ QPlainTextEdit, QTreeView, QTableView, QListWidget, QLineEdit, QComboBox {{
 }}
 QLineEdit {{ padding: 6px 10px; }}
 QComboBox {{ padding: 4px 8px; }}
+QComboBox::drop-down {{ border: none; width: 22px; }}
+QComboBox QAbstractItemView {{
+    background: {_PANEL}; color: {_TEXT};
+    border: 1px solid {_BORDER}; border-radius: 8px;
+    selection-background-color: {_SELECTION}; selection-color: {_TEXT};
+    outline: none; padding: 4px;
+}}
+QComboBox QAbstractItemView::item {{
+    padding: 6px 12px; min-height: 22px; border-radius: 6px;
+}}
+QComboBox QAbstractItemView::item:selected {{ background: {_SELECTION}; color: {_TEXT}; }}
 
 QListWidget {{ outline: none; }}
 QListWidget::item {{ padding: 7px 10px; border-radius: 6px; }}

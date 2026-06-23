@@ -104,3 +104,44 @@ def test_tokens_use_monospace_font(app):
     row = panel._active_rows()[0]
     assert theme.MONO_FONT_FAMILY.split(",")[0] in row.tokens.font().family() \
         or row.tokens.font().family() != ""
+
+
+def _combo_text_for_data(combo, value):
+    return combo.itemText(combo.findData(value))
+
+
+def test_lookup_dropdown_shows_readable_labels(app):
+    panel = QueryPanel(lookups=["gt", "icontains"])
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "name=Bob")])
+    lookup = panel._active_rows()[0].lookup
+    assert _combo_text_for_data(lookup, "exact") == "= Equals"
+    assert _combo_text_for_data(lookup, "gt") == "> Greater than"
+    assert _combo_text_for_data(lookup, "icontains") == "\u220b Contains (ignore case)"
+
+
+def test_op_dropdown_labels_keep_raw_data(app):
+    panel = QueryPanel()
+    panel.set_mode("structured")
+    panel.set_rows([("exclude", "name=Bob")])
+    op = panel._active_rows()[0].op
+    assert _combo_text_for_data(op, "filter") == "\u2713 Filter"
+    assert _combo_text_for_data(op, "exclude") == "\u2715 Exclude"
+    # rows()/current_rows() still emit the raw operator key, not the label.
+    assert panel.rows() == [("exclude", "name=Bob")]
+    assert panel.current_rows() == [("exclude", {"name": "Bob"})]
+
+
+def test_structured_lookup_round_trips_via_data(app):
+    panel = QueryPanel(lookups=["gt", "contains"])
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "id__gt=1")])
+    assert panel.current_rows() == [("filter", {"id__gt": 1})]
+    assert panel.rows() == [("filter", "id__gt=1")]
+
+
+def test_results_pane_takes_free_space(app):
+    from PySide6.QtWidgets import QSizePolicy
+    panel = QueryPanel()
+    assert panel.results.sizePolicy().verticalPolicy() == QSizePolicy.Expanding
+    assert panel.stack.sizePolicy().verticalPolicy() == QSizePolicy.Maximum
