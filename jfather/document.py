@@ -16,6 +16,7 @@ class Document:
         self.query_rows = []
         self.search_term = ""
         self.expanded_paths = set()
+        self.focus_path = []
 
     def set_text(self, text):
         if text != self.text:

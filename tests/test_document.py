@@ -77,3 +77,15 @@ def test_state_isolated_between_documents():
     d2 = mgr.new(name="two")
     d1.query_rows.append(("filter", "id__gt=1"))
     assert d2.query_rows == []
+
+
+def test_document_focus_path_defaults_empty():
+    assert Document().focus_path == []
+
+
+def test_focus_path_isolated_between_documents():
+    mgr = DocumentManager()
+    d1 = mgr.new(name="one")
+    d2 = mgr.new(name="two")
+    d1.focus_path.append("users")
+    assert d2.focus_path == []
