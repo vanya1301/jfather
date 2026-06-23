@@ -1,0 +1,146 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      shell: bash
+    
+    - name: Install dependencies
+      run: |
+        uv sync
+    
+    - name: Run tests
+      run: |
+        uv run pytest -v
+      env:
+        QT_QPA_PLATFORM: offscreen
+
+  build:
+    name: Build ${{ matrix.os }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: jfather-macos
+            asset_name: jfather-macos
+          - os: windows-latest
+            artifact_name: jfather-windows.exe
+            asset_name: jfather-windows.exe
+          - os: ubuntu-latest
+            artifact_name: jfather-linux
+            asset_name: jfather-linux
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      shell: bash
+    
+    - name: Install dependencies
+      run: |
+        uv sync
+    
+    - name: Install PyInstaller
+      run: |
+        uv pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        uv run pyinstaller jfather.spec
+    
+    - name: Rename executable (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd dist
+        mv jfather ${{ matrix.artifact_name }}
+        chmod +x ${{ matrix.artifact_name }}
+    
+    - name: Rename executable (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd dist
+        mv jfather.exe ${{ matrix.artifact_name }}
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: dist/${{ matrix.artifact_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: jfather-macos
+        path: dist
+    
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: jfather-windows.exe
+        path: dist
+    
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: jfather-linux
+        path: dist
+    
+    - name: Make Linux executable
+      run: chmod +x dist/jfather-linux
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          dist/jfather-macos
+          dist/jfather-windows.exe
+          dist/jfather-linux
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
