@@ -17,12 +17,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import jsontools, query, theme
+from . import jsontools, query, search, theme
 from .document import DocumentManager
 from .editor import JsonEditor
 from .query_panel import QueryPanel
+from .search_bar import SearchBar
 from .sidebar import DocumentSidebar
-from .tree_model import JsonTreeModel
+from .tree_model import JsonTreeModel, index_for_path
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +35,8 @@ class MainWindow(QMainWindow):
 
         self.manager = DocumentManager()
         self.tree_model = JsonTreeModel({})
+        self._search_results = []
+        self._search_pos = -1
 
         self._build_ui()
         self._build_toolbar()
@@ -61,9 +64,20 @@ class MainWindow(QMainWindow):
         self.tree = QTreeView()
         self.tree.setModel(self.tree_model)
 
+        self.search_bar = SearchBar()
+        self.search_bar.queryChanged.connect(self._on_search)
+        self.search_bar.nextRequested.connect(lambda: self._navigate_search(1))
+        self.search_bar.prevRequested.connect(lambda: self._navigate_search(-1))
+
+        tree_pane = QWidget()
+        tree_layout = QVBoxLayout(tree_pane)
+        tree_layout.setContentsMargins(0, 0, 0, 0)
+        tree_layout.addWidget(self.search_bar)
+        tree_layout.addWidget(self.tree)
+
         center_split = QSplitter(Qt.Horizontal)
         center_split.addWidget(self.editor)
-        center_split.addWidget(self.tree)
+        center_split.addWidget(tree_pane)
         center_split.setSizes([600, 600])
 
         self.query_panel = QueryPanel()
@@ -177,6 +191,7 @@ class MainWindow(QMainWindow):
         self.editor.set_text(doc.text)
         self.query_panel.set_rows(doc.query_rows)
         self.refresh_tree()
+        self.search_bar.input.setText(doc.search_term)
 
     def _refresh_sidebar(self):
         self.sidebar.refresh(self.manager)
@@ -205,6 +220,38 @@ class MainWindow(QMainWindow):
 
     def current_text(self):
         return self.editor.text()
+
+    # ---- Search ----------------------------------------------------------
+    def _on_search(self, term):
+        doc = self.manager.active
+        if doc is not None:
+            doc.search_term = term
+        self._search_results = []
+        self._search_pos = -1
+        if term:
+            try:
+                data = jsontools.parse(self.editor.text())
+            except ValueError:
+                data = None
+            if data is not None:
+                self._search_results = search.search(data, term)
+        if self._search_results:
+            self._navigate_search(1)
+        else:
+            self.search_bar.set_count(0, len(self._search_results))
+
+    def _navigate_search(self, step):
+        total = len(self._search_results)
+        if total == 0:
+            self.search_bar.set_count(0, 0)
+            return
+        self._search_pos = (self._search_pos + step) % total
+        path = self._search_results[self._search_pos]
+        index = index_for_path(self.tree_model, path)
+        if index.isValid():
+            self.tree.setCurrentIndex(index)
+            self.tree.scrollTo(index)
+        self.search_bar.set_count(self._search_pos + 1, total)
 
     # ---- Tools -----------------------------------------------------------
     def apply_format(self):

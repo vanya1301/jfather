@@ -53,6 +53,27 @@ class JsonNode:
         return self._children
 
 
+def index_for_path(model, path):
+    """Resolve a path (list of keys/indices) to its column-0 QModelIndex.
+
+    Returns an invalid QModelIndex if any path segment cannot be found.
+    """
+    from PySide6.QtCore import QModelIndex
+
+    parent = QModelIndex()
+    for key in path:
+        match = QModelIndex()
+        for row in range(model.rowCount(parent)):
+            candidate = model.index(row, 0, parent)
+            if candidate.internalPointer().key == key:
+                match = candidate
+                break
+        if not match.isValid():
+            return QModelIndex()
+        parent = match
+    return parent
+
+
 def _value_text(value):
     if isinstance(value, dict):
         return "{%d items}" % len(value)

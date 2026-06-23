@@ -48,3 +48,20 @@ def test_query_target_falls_back_to_root(app):
     win.editor.set_text(json.dumps([{"id": 1}]))
     win.sync_from_editor()
     assert win.query_target() == [{"id": 1}]
+
+
+def test_search_finds_and_selects_match(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"user": {"name": "Alice"}}))
+    win.sync_from_editor()
+    win.search_bar.input.setText("Alice")
+    assert win.search_bar.count_label.text() == "1/1"
+    assert win.tree.currentIndex().isValid()
+
+
+def test_search_no_match_shows_zero(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps({"a": 1}))
+    win.sync_from_editor()
+    win.search_bar.input.setText("zzz")
+    assert win.search_bar.count_label.text() == "0/0"
