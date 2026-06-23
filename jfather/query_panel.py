@@ -167,12 +167,23 @@ class _StructuredRow(QWidget):
         lookup = self.lookup.currentData()
         return field if lookup == "exact" else f"{field}__{lookup}"
 
+    def _coerced_value(self):
+        """A picked suggestion is a literal scalar; free text may be a list/range.
+
+        Suggestions come from real cell values, so a comma or ``..`` in them is
+        data, not token syntax. Only fall back to list/range parsing for text
+        the user typed that does not match a suggestion.
+        """
+        text = self.value.currentText()
+        if self.value.findText(text) >= 0:
+            return query.coerce_scalar(text)
+        return query.coerce_value(text)
+
     def as_text(self):
         return (self.op.currentData(), f"{self._key()}={self.value.currentText()}")
 
     def as_kwargs(self):
-        return (self.op.currentData(),
-                {self._key(): query.coerce_value(self.value.currentText())})
+        return (self.op.currentData(), {self._key(): self._coerced_value()})
 
 
 class QueryPanel(QWidget):

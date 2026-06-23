@@ -177,3 +177,21 @@ def test_value_dropdown_accepts_free_text(app):
     panel.set_mode("structured")
     panel.set_rows([("filter", "id__in=1,2,3")])
     assert panel.current_rows() == [("filter", {"id__in": [1, 2, 3]})]
+
+
+def test_picked_suggestion_with_comma_is_literal(app):
+    panel = QueryPanel(get_field_values=lambda f: ["Smith, John", "Doe"])
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "name=Doe")])
+    row = panel._active_rows()[0]
+    row.value.setCurrentText("Smith, John")
+    # exact suggestion -> literal string, not a comma-split list
+    assert panel.current_rows() == [("filter", {"name": "Smith, John"})]
+
+
+def test_picked_suggestion_with_dotdot_is_literal(app):
+    panel = QueryPanel(get_field_values=lambda f: ["a..b"])
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "code=a..b")])
+    # exact suggestion -> literal string, not a range (which would raise)
+    assert panel.current_rows() == [("filter", {"code": "a..b"})]
