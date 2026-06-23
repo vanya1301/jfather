@@ -7,32 +7,37 @@ Status: Approved (pending written-spec review)
 
 Improve usability of the existing jfather JSON viewer/editor:
 
-1. Keyboard shortcuts for common actions.
+1. Cross-platform keyboard shortcuts for common actions.
 2. A table view for tabular data (arrays of objects), with tree fallback.
 3. A redesigned, discoverable query builder (structured + smart-text modes).
-4. An in-editor find bar (Cmd+F).
-5. Native-looking (macOS) scrollbars.
+4. An in-editor find bar (Find shortcut).
+5. Native-looking scrollbars.
+6. Focus / drill-in: select a nested node to re-root the viewer and query scope.
 
 This builds on the current app: pure-logic modules (`jsontools`, `query`,
 `search`, `document`) plus Qt modules (`tree_model`, `editor`, `sidebar`,
 `query_panel`, `search_bar`, `app`, `theme`).
 
-## 1. Keyboard Shortcuts
+## 1. Keyboard Shortcuts (cross-platform)
 
 Implemented as `QAction`s on the main window with `QKeySequence` shortcuts.
 The toolbar actions and shortcuts share the same handler methods.
 
-| Shortcut | Action |
-| --- | --- |
-| `Cmd+W` | Close the active document (uses existing unsaved-changes prompt) |
-| `Cmd+S` | Save the active document |
-| `Cmd+Shift+F` | Format JSON (whole document) |
-| `Cmd+Return` (Enter) | Run the current query |
-| `Cmd+F` | Toggle the editor find bar and focus the editor's find input |
+Shortcuts must work on macOS, Windows, and Linux. Use Qt's portable forms so
+the platform modifier is applied automatically — `QKeySequence.StandardKey`
+where one exists, and `"Ctrl+..."` strings otherwise (Qt maps `Ctrl` to the
+Command key on macOS and to the Control key elsewhere).
 
-Use `QKeySequence` portable forms (e.g. `QKeySequence.Save`,
-`"Ctrl+W"` which maps to Cmd on macOS, `"Ctrl+Shift+F"`, `"Ctrl+Return"`,
-`QKeySequence.Find`).
+| Action | Binding | mac / Win+Linux |
+| --- | --- | --- |
+| Close active document | `QKeySequence.Close` | Cmd+W / Ctrl+W |
+| Save active document | `QKeySequence.Save` | Cmd+S / Ctrl+S |
+| Format JSON (whole document) | `"Ctrl+Shift+F"` | Cmd+Shift+F / Ctrl+Shift+F |
+| Run query | `"Ctrl+Return"` | Cmd+Return / Ctrl+Return |
+| Toggle editor find bar | `QKeySequence.Find` | Cmd+F / Ctrl+F |
+
+Display labels in tooltips should use `QKeySequence.toString(NativeText)` so each
+platform shows its own modifier names.
 
 ## 2. Right Pane: Table with Tree Fallback
 
@@ -49,15 +54,17 @@ Use `QKeySequence` portable forms (e.g. `QKeySequence.Save`,
   - `row_object(row) -> dict` accessor for search/selection use.
 
 ### App integration (`app.py`)
-- Right pane becomes a `QStackedWidget` holding the existing `QTreeView` and a
-  new `QTableView`, plus the existing `SearchBar` on top (shared).
-- A `_refresh_view()` chooses the widget per the active query target's shape:
-  - If `is_tabular(parsed_target)` → populate `JsonTableModel`, show table.
+- Right pane is laid out top-to-bottom: **breadcrumb bar** (section 7), the
+  shared **`SearchBar`**, then a `QStackedWidget` holding the existing
+  `QTreeView` and a new `QTableView`.
+- A `_refresh_view()` chooses the widget per the **focused node**'s shape (see
+  section 7):
+  - If `is_tabular(focused_value)` → populate `JsonTableModel`, show table.
   - Else → populate `JsonTreeModel`, show tree.
-  - "Target" follows the existing rule: selected array node, else root if it's a
-    list, else the whole parsed doc for the tree.
-- `_refresh_view()` runs whenever the parsed document changes (debounced sync)
-  and on document switch.
+  - The focused value defaults to the whole parsed document; drilling in
+    re-roots it (section 7).
+- `_refresh_view()` runs whenever the parsed document changes (debounced sync),
+  on document switch, and on focus change.
 
 ## 3. Query Builder Redesign
 
@@ -95,7 +102,7 @@ runs them; the panel owns mode state and widgets.
 - A small "?" help affordance lists lookups with one-line descriptions
   (static text from the spec's known lookups).
 
-## 4. Editor Find Bar (Cmd+F)
+## 4. Editor Find Bar (Find shortcut)
 
 ### New module `jfather/find_bar.py`
 - `FindBar(QWidget)`: `input` QLineEdit, `count_label`, prev/next buttons,
@@ -112,7 +119,7 @@ runs them; the panel owns mode state and widgets.
   - `find_next(forward=True)`: moves the cursor/selection to the next/previous
     match (wrap-around) and returns the 1-based active index (0 if none).
   - `clear_find()`: removes highlights.
-- App shows/hides the `FindBar` over the editor (Cmd+F toggles). The bar drives
+- App shows/hides the `FindBar` over the editor (the Find shortcut toggles). The bar drives
   `find_matches`/`find_next`; count label shows `active/total`. Esc hides the
   bar and calls `clear_find()`, refocusing the editor.
 
@@ -139,6 +146,41 @@ The shared `SearchBar` works against the active right-pane view:
 - The app routes search to the tree or table path based on which stacked widget
   is visible.
 
+## 7. Focus / Drill-In (re-root viewer + query scope)
+
+The user can drill into a nested container so it becomes both the displayed
+object and the query scope.
+
+### State
+- `Document` gains `focus_path: list` (keys/indices from the document root to the
+  focused node); empty list means "whole document". Per-document, restored on
+  switch.
+- The app resolves `focus_path` against the parsed document to get the focused
+  value. If the path no longer resolves (e.g. after an edit), it falls back to
+  the nearest valid ancestor, down to the root.
+
+### Trigger & navigation
+- **Double-click** a container node (object or array) in the tree or a table row
+  re-roots the viewer to that node (appends to `focus_path`). Double-clicking a
+  scalar leaf does nothing.
+- A **breadcrumb bar** (`jfather/breadcrumb.py`, a `Breadcrumb(QWidget)` with a
+  `pathChanged(list)` signal and `set_path(list)`) sits above the search bar and
+  shows `root > users > 0 > address`. Clicking a crumb sets `focus_path` to that
+  prefix. The leading `root` crumb resets to the whole document.
+
+### Effect
+- `_refresh_view()` renders the focused value (table if tabular, else tree).
+- **Query scope = the focused value.** The existing per-selection target rule is
+  replaced by focus:
+  - If the focused value is a `list` → it is the query target; Run is enabled.
+  - If it is not a list → the query Run action is disabled and the results pane
+    shows "Focus an array to query." Drilling into / breadcrumbing to an array
+    re-enables it.
+- Table search and tree search operate within the focused value.
+
+### Breadcrumb labels
+- Keys shown as-is; list indices shown as `[i]`. Root shown as `root`.
+
 ## Error Handling
 
 - Malformed query text tokens or unknown lookups: caught in the app's run-query
@@ -161,21 +203,27 @@ The shared `SearchBar` works against the active right-pane view:
   label format.
 - `editor`: `find_matches` returns correct count and adds highlights;
   `find_next` advances index with wrap; `clear_find` removes highlights.
-- `app`: the four shortcuts + Cmd+F are registered with the expected key
+- `app`: the five shortcuts are registered with the expected portable key
   sequences; right pane switches table↔tree by data shape; table search selects
   a matching row; run-query still returns results; format shortcut formats.
+- focus: `focus_path` resolution (valid path, stale path → nearest ancestor,
+  root); double-click on a container appends to the path; breadcrumb click sets
+  a prefix; query disabled when focused value is not a list and enabled when it
+  is; `Breadcrumb.set_path` renders crumbs and `pathChanged` emits the prefix.
 
 ## Out of Scope (YAGNI)
 
-- Find-and-replace in the editor, column sorting/resizing persistence, nested
-  drill-down from table cells, query history, saved queries, OR/`Q` logic
-  (pending upstream collection-query support).
+- Find-and-replace in the editor, column sorting/resizing persistence, query
+  history, saved queries, OR/`Q` logic (pending upstream collection-query
+  support).
 
 ## Affected Files
 
-- New: `jfather/table_model.py`, `jfather/find_bar.py`.
+- New: `jfather/table_model.py`, `jfather/find_bar.py`, `jfather/breadcrumb.py`.
 - Rewrite: `jfather/query_panel.py`, `jfather/theme.py`.
 - Modify: `jfather/app.py` (shortcuts, stacked right pane + view routing,
-  find-bar wiring, table search), `jfather/editor.py` (find support).
-- Tests: new `test_table_model.py`, `test_find_bar.py`; updated
-  `test_query_panel.py`, `test_app.py`, `test_editor.py`.
+  find-bar wiring, table search, focus/breadcrumb), `jfather/editor.py` (find
+  support), `jfather/document.py` (`focus_path`).
+- Tests: new `test_table_model.py`, `test_find_bar.py`, `test_breadcrumb.py`;
+  updated `test_query_panel.py`, `test_app.py`, `test_editor.py`,
+  `test_document.py`.
