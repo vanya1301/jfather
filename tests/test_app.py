@@ -175,6 +175,20 @@ def test_table_sort_keeps_source_mapping(app):
     assert src_row == 1                # source row (insertion position) — differs, proving mapping
 
 
+def test_field_values_distinct_and_stringified(app):
+    win = MainWindow()
+    win.editor.set_text(json.dumps([
+        {"name": "Alice", "age": 30, "active": True},
+        {"name": "Bob", "age": 25, "active": False},
+        {"name": "Alice", "age": 30, "active": True},
+    ]))
+    win.sync_from_editor()
+    assert win._field_values("name") == ["Alice", "Bob"]
+    assert win._field_values("age") == ["30", "25"]
+    assert win._field_values("active") == ["true", "false"]
+    assert win._field_values("missing") == []
+
+
 def test_table_uses_monospace_font(app):
     from jfather import theme
     win = MainWindow()

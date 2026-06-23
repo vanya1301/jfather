@@ -112,8 +112,10 @@ class _TextRow(QWidget):
 
 class _StructuredRow(QWidget):
     def __init__(self, op="filter", field="", lookup="exact", value="",
-                 field_names=None, lookups=None, parent=None):
+                 field_names=None, lookups=None, get_field_values=None,
+                 parent=None):
         super().__init__(parent)
+        self._get_field_values = get_field_values or (lambda field: [])
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.op = QComboBox()
@@ -132,8 +134,15 @@ class _StructuredRow(QWidget):
             self.lookup.addItem(_lookup_label(lookup_value), lookup_value)
         _select_data(self.lookup, lookup)
         _fit_popup_to_contents(self.lookup)
-        self.value = QLineEdit(value)
-        self.value.setPlaceholderText("value")
+        # Editable combo: suggests distinct values seen in the focused list for
+        # the chosen field, while still accepting free text (lists, ranges).
+        self.value = QComboBox()
+        self.value.setEditable(True)
+        self.value.setInsertPolicy(QComboBox.NoInsert)
+        self.value.lineEdit().setPlaceholderText("value")
+        self._reload_values()
+        self.value.setCurrentText(value)
+        self.field.currentTextChanged.connect(self._reload_values)
         self.remove = QPushButton("\u2212")
         self.remove.setFixedWidth(32)
         layout.addWidget(self.op)
@@ -142,25 +151,38 @@ class _StructuredRow(QWidget):
         layout.addWidget(self.value)
         layout.addWidget(self.remove)
 
+    def _reload_values(self, *_):
+        """Repopulate value suggestions for the current field, keeping text."""
+        current = self.value.currentText()
+        self.value.blockSignals(True)
+        self.value.clear()
+        for candidate in self._get_field_values(self.field.currentText().strip()):
+            self.value.addItem(candidate)
+        self.value.setCurrentText(current)
+        self.value.blockSignals(False)
+        _fit_popup_to_contents(self.value)
+
     def _key(self):
         field = self.field.currentText().strip()
         lookup = self.lookup.currentData()
         return field if lookup == "exact" else f"{field}__{lookup}"
 
     def as_text(self):
-        return (self.op.currentData(), f"{self._key()}={self.value.text()}")
+        return (self.op.currentData(), f"{self._key()}={self.value.currentText()}")
 
     def as_kwargs(self):
         return (self.op.currentData(),
-                {self._key(): query.coerce_value(self.value.text())})
+                {self._key(): query.coerce_value(self.value.currentText())})
 
 
 class QueryPanel(QWidget):
     runRequested = Signal()
 
-    def __init__(self, get_field_names=None, lookups=None, parent=None):
+    def __init__(self, get_field_names=None, get_field_values=None,
+                 lookups=None, parent=None):
         super().__init__(parent)
         self._get_field_names = get_field_names or (lambda: [])
+        self._get_field_values = get_field_values or (lambda field: [])
         self.lookups = (
             list(lookups) if lookups is not None else query.available_lookups()
         )
@@ -259,7 +281,8 @@ class QueryPanel(QWidget):
                 for token in (text.split() or [""]):
                     field, lookup, value = self._parse_token_for_structured(token)
                     row = _StructuredRow(op, field, lookup, value,
-                                         field_names, self.lookups)
+                                         field_names, self.lookups,
+                                         self._get_field_values)
                     self._structured_rows.append(row)
                     self._register_row(row)
                     self._structured_layout.addWidget(row)
@@ -307,7 +330,8 @@ class QueryPanel(QWidget):
         self._text_layout.addWidget(row)
 
     def _add_structured_row(self, field_names):
-        row = _StructuredRow("filter", "", "exact", "", field_names, self.lookups)
+        row = _StructuredRow("filter", "", "exact", "", field_names,
+                             self.lookups, self._get_field_values)
         self._structured_rows.append(row)
         self._register_row(row)
         self._structured_layout.addWidget(row)

@@ -33,6 +33,15 @@ from .table_model import JsonTableModel, is_tabular
 from .tree_model import JsonTreeModel, index_for_path, path_for_index
 
 
+def _scalar_text(value):
+    """Render a scalar as the token text the query parser coerces back."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -133,7 +142,10 @@ class MainWindow(QMainWindow):
         center_split.addWidget(tree_pane)
         center_split.setSizes([600, 600])
 
-        self.query_panel = QueryPanel(get_field_names=self._field_names)
+        self.query_panel = QueryPanel(
+            get_field_names=self._field_names,
+            get_field_values=self._field_values,
+        )
         self.query_panel.runRequested.connect(self.run_query)
 
         right_split = QSplitter(Qt.Vertical)
@@ -303,6 +315,27 @@ class MainWindow(QMainWindow):
         elif isinstance(value, dict):
             names = list(value.keys())
         return names
+
+    def _field_values(self, field, limit=200):
+        """Distinct scalar values for `field` across the focused array."""
+        value = self.focused_value()
+        if not field or not isinstance(value, list):
+            return []
+        out = []
+        seen = set()
+        for item in value:
+            if not isinstance(item, dict) or field not in item:
+                continue
+            cell = item[field]
+            if isinstance(cell, (dict, list)):
+                continue
+            text = _scalar_text(cell)
+            if text not in seen:
+                seen.add(text)
+                out.append(text)
+            if len(out) >= limit:
+                break
+        return out
 
     def focused_value(self):
         try:

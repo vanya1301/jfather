@@ -145,3 +145,35 @@ def test_results_pane_takes_free_space(app):
     panel = QueryPanel()
     assert panel.results.sizePolicy().verticalPolicy() == QSizePolicy.Expanding
     assert panel.stack.sizePolicy().verticalPolicy() == QSizePolicy.Maximum
+
+
+def test_value_dropdown_offers_field_values(app):
+    panel = QueryPanel(
+        get_field_values=lambda f: ["Alice", "Bob"] if f == "name" else []
+    )
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "name=Alice")])
+    row = panel._active_rows()[0]
+    items = [row.value.itemText(i) for i in range(row.value.count())]
+    assert items == ["Alice", "Bob"]
+    assert row.value.currentText() == "Alice"
+    # editable: the selected suggestion still builds a real query value
+    assert panel.current_rows() == [("filter", {"name": "Alice"})]
+
+
+def test_value_dropdown_refreshes_when_field_changes(app):
+    values = {"name": ["Alice"], "city": ["Paris", "Rome"]}
+    panel = QueryPanel(get_field_values=lambda f: values.get(f, []))
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "name=Alice")])
+    row = panel._active_rows()[0]
+    row.field.setCurrentText("city")
+    items = [row.value.itemText(i) for i in range(row.value.count())]
+    assert items == ["Paris", "Rome"]
+
+
+def test_value_dropdown_accepts_free_text(app):
+    panel = QueryPanel(get_field_values=lambda f: ["1", "2"])
+    panel.set_mode("structured")
+    panel.set_rows([("filter", "id__in=1,2,3")])
+    assert panel.current_rows() == [("filter", {"id__in": [1, 2, 3]})]
