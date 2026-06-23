@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.12"]
     
     steps:
@@ -61,9 +61,6 @@ jobs:
           - os: macos-latest
             artifact_name: jfather-macos
             asset_name: jfather-macos
-          - os: windows-latest
-            artifact_name: jfather-windows.exe
-            asset_name: jfather-windows.exe
           - os: ubuntu-latest
             artifact_name: jfather-linux
             asset_name: jfather-linux
@@ -98,18 +95,11 @@ jobs:
       run: |
         uv run pyinstaller jfather.spec
     
-    - name: Rename executable (Unix)
-      if: matrix.os != 'windows-latest'
+    - name: Rename executable
       run: |
         cd dist
         mv jfather ${{ matrix.artifact_name }}
         chmod +x ${{ matrix.artifact_name }}
-    
-    - name: Rename executable (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cd dist
-        mv jfather.exe ${{ matrix.artifact_name }}
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4

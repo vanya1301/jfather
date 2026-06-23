@@ -90,7 +90,7 @@ QT_QPA_PLATFORM=offscreen uv run pytest -v
 
 2. GitHub Actions will automatically:
    - Run tests on all platforms
-   - Build executables for macOS, Windows, and Linux
+   - Build executables for macOS and Linux
    - Create a GitHub Release with all assets
 
 3. Users can download executables from the GitHub Releases page
