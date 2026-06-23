@@ -6,8 +6,9 @@ from PySide6.QtGui import (
     QFont,
     QSyntaxHighlighter,
     QTextCharFormat,
+    QTextCursor,
 )
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtWidgets import QPlainTextEdit, QTextEdit
 
 
 def _fmt(color, bold=False):
@@ -55,6 +56,10 @@ class JsonEditor(QPlainTextEdit):
         self.setFont(font)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.highlighter = JsonHighlighter(self.document())
+        self._match_cursors = []
+        self._find_index = -1
+        self._match_format = QTextCharFormat()
+        self._match_format.setBackground(QColor("#5f5f00"))
 
     def text(self):
         return self.toPlainText()
@@ -62,3 +67,35 @@ class JsonEditor(QPlainTextEdit):
     def set_text(self, text):
         if text != self.toPlainText():
             self.setPlainText(text)
+
+    def find_matches(self, term):
+        self._match_cursors = []
+        self._find_index = -1
+        selections = []
+        if term:
+            document = self.document()
+            cursor = QTextCursor(document)
+            while True:
+                cursor = document.find(term, cursor)
+                if cursor.isNull():
+                    break
+                self._match_cursors.append(QTextCursor(cursor))
+                selection = QTextEdit.ExtraSelection()
+                selection.cursor = cursor
+                selection.format = self._match_format
+                selections.append(selection)
+        self.setExtraSelections(selections)
+        return len(self._match_cursors)
+
+    def find_next(self, forward=True):
+        if not self._match_cursors:
+            return 0
+        step = 1 if forward else -1
+        self._find_index = (self._find_index + step) % len(self._match_cursors)
+        self.setTextCursor(self._match_cursors[self._find_index])
+        return self._find_index + 1
+
+    def clear_find(self):
+        self._match_cursors = []
+        self._find_index = -1
+        self.setExtraSelections([])
