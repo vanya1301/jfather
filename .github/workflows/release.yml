@@ -82,33 +82,71 @@ jobs:
     - name: Install PyInstaller
       run: |
         uv pip install pyinstaller
-    
+
+    # macOS signing/notarization/packaging logic lives in scripts/macos/* so it
+    # can be tested locally. Steps below are thin wrappers around those scripts.
+    - name: Import signing certificate (macOS)
+      if: matrix.os == 'macos-latest'
+      env:
+        MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+        MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD }}
+      run: ./scripts/macos/import-cert.sh
+
     - name: Build executable
+      env:
+        # PyInstaller signs nested binaries with this identity when present
+        PYINSTALLER_CODESIGN_IDENTITY: ${{ matrix.os == 'macos-latest' && secrets.MACOS_SIGN_IDENTITY || '' }}
+        PYINSTALLER_ENTITLEMENTS: ${{ matrix.os == 'macos-latest' && format('{0}/packaging/entitlements.plist', github.workspace) || '' }}
       run: |
         uv run pyinstaller jfather.spec
-    
-    - name: Prepare macOS artifact
+
+    - name: Sign app bundle (macOS)
       if: matrix.os == 'macos-latest'
-      run: |
-        cd dist
-        # Create a zip of the .app bundle for macOS
-        mv jfather.app jfather-macos.app
-        zip -r jfather-macos.zip jfather-macos.app
-    
+      env:
+        MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      run: ./scripts/macos/sign-app.sh
+
+    - name: Notarize app (macOS)
+      if: matrix.os == 'macos-latest'
+      env:
+        NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+        NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+        NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      run: ./scripts/macos/notarize.sh dist/jfather.app
+
+    - name: Package DMG (macOS)
+      if: matrix.os == 'macos-latest'
+      env:
+        MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      run: ./scripts/macos/build-dmg.sh
+
+    - name: Notarize DMG (macOS)
+      if: matrix.os == 'macos-latest'
+      env:
+        NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+        NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+        NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      run: ./scripts/macos/notarize.sh dist/jfather-macos.dmg
+
+    - name: Clean up keychain (macOS)
+      if: ${{ always() && matrix.os == 'macos-latest' }}
+      run: ./scripts/macos/cleanup-keychain.sh
+
     - name: Prepare Linux artifact
       if: matrix.os == 'ubuntu-latest'
       run: |
         cd dist
         mv jfather ${{ matrix.artifact_name }}
         chmod +x ${{ matrix.artifact_name }}
-    
+
     - name: Upload macOS artifact
       if: matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.asset_name }}
-        path: dist/jfather-macos.zip
-    
+        path: dist/jfather-macos.dmg
+
     - name: Upload Linux artifact
       if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
@@ -143,7 +181,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/jfather-macos.zip
+          dist/jfather-macos.dmg
           dist/jfather-linux
         generate_release_notes: true
         draft: false
